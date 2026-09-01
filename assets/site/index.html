@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="description" content="Checklist de fotos com data, hora e localização." />
+  <title>Photo List — Checklist de Fotos</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">PHOTO LIST</p>
+        <h1>Checklist de fotos</h1>
+        <p class="subtitle">Capture cada item com data, hora e localização.</p>
+      </div>
+      <div class="progress-pill" id="progressPill">0/17</div>
+    </header>
+
+    <section class="location-card" aria-live="polite">
+      <div class="status-dot" id="locationDot"></div>
+      <div class="location-copy">
+        <strong id="locationStatus">Localização: buscando…</strong>
+        <span id="locationDetails">Permita o acesso à localização para gravar GPS e endereço.</span>
+      </div>
+      <button class="text-button" id="refreshLocationBtn" type="button">Atualizar</button>
+    </section>
+
+    <section class="camera-panel" aria-label="Câmera">
+      <div class="camera-wrap">
+        <video id="camera" autoplay playsinline muted></video>
+        <canvas id="overlayCanvas" aria-hidden="true"></canvas>
+        <div class="camera-placeholder" id="cameraPlaceholder">
+          <span class="camera-icon">⌾</span>
+          <strong>Câmera pronta para o checklist</strong>
+          <span>Toque em “Iniciar câmera” para começar.</span>
+        </div>
+        <div class="camera-hud">
+          <span id="hudItem">Selecione um item</span>
+          <span id="hudTime">--/--/---- --:--:--</span>
+        </div>
+        <div class="camera-live-location" id="cameraLiveLocation">Endereço: aguardando localização…</div>
+        <button class="camera-expand-button" id="cameraExpandBtn" type="button" aria-label="Expandir câmera" aria-pressed="false" title="Expandir câmera">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="camera-preview" id="cameraPreview" hidden>
+          <img id="cameraPreviewImage" alt="Pré-visualização da foto capturada" />
+          <div class="camera-preview-actions">
+            <button class="camera-preview-button" id="cancelCaptureBtn" type="button">Cancelar</button>
+            <button class="camera-preview-button primary" id="saveCaptureBtn" type="button">Salvar</button>
+          </div>
+        </div>
+      </div>
+      <div class="camera-actions">
+        <button class="secondary-button" id="startCameraBtn" type="button">Iniciar câmera</button>
+        <button class="capture-button" id="captureBtn" type="button" disabled aria-label="Tirar foto">
+          <span></span>
+        </button>
+        <button class="secondary-button" id="switchCameraBtn" type="button" disabled>Virar câmera</button>
+      </div>
+      <p class="hint" id="cameraHint">A câmera precisa estar em HTTPS (ou localhost) para funcionar no navegador do celular. Itens “Print” usam a galeria.</p>
+    </section>
+
+    <input id="galleryInput" type="file" accept="image/*" hidden />
+
+    <section class="checklist-section">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">ETAPAS</p>
+          <h2>Fotos obrigatórias</h2>
+        </div>
+        <button class="text-button" id="resetBtn" type="button">Limpar tudo</button>
+      </div>
+      <div class="checklist" id="checklist" aria-live="polite">
+        <article class="check-item active" data-initial-item="0">
+          <div class="check-main"><button class="status-badge" type="button" disabled>1</button><div class="item-copy"><strong>Roteador Frente</strong><span>Ainda não fotografado</span></div></div>
+          <button class="item-action" type="button" disabled>Fotografar</button>
+        </article>
+        <article class="check-item" data-initial-item="1">
+          <div class="check-main"><button class="status-badge" type="button" disabled>2</button><div class="item-copy"><strong>Roteador Verso</strong><span>Ainda não fotografado</span></div></div>
+          <button class="item-action" type="button" disabled>Fotografar</button>
+        </article>
+        <article class="check-item" data-initial-item="2">
+          <div class="check-main"><button class="status-badge" type="button" disabled>3</button><div class="item-copy"><strong>ONU Frente</strong><span>Ainda não fotografado</span></div></div>
+          <button class="item-action" type="button" disabled>Fotografar</button>
+        </article>
+        <article class="check-item" data-initial-item="3">
+          <div class="check-main"><button class="status-badge" type="button" disabled>4</button><div class="item-copy"><strong>ONU Verso</strong><span>Ainda não fotografado</span></div></div>
+          <button class="item-action" type="button" disabled>Fotografar</button>
+        </article>
+        <article class="check-item" data-initial-item="4">
+          <div class="check-main"><button class="status-badge" type="button" disabled>5</button><div class="item-copy"><strong>Print comodato</strong><span>Selecionar print da galeria</span></div></div>
+          <button class="item-action" type="button" disabled>Galeria</button>
+        </article>
+        <article class="check-item" data-initial-item="5">
+          <div class="check-main"><button class="status-badge" type="button" disabled>6</button><div class="item-copy"><strong>Bucha/Parafuso</strong><span>Ainda não fotografado</span></div></div>
+          <button class="item-action" type="button" disabled>Fotografar</button>
+        </article>
+        <article class="check-item" data-initial-item="6">
+          <div class="check-main"><button class="status-badge" type="button" disabled>7</button><div class="item-copy"><strong>Print ONU</strong><span>Selecionar print da galeria</span></div></div>
+          <button class="item-action" type="button" disabled>Galeria</button>
+        </article>
+        <article class="check-item" data-initial-item="7">
+          <div class="check-main"><button class="status-badge" type="button" disabled>8</button><div class="item-copy"><strong>Print Roteador TR069</strong><span>Selecionar print da galeria</span></div></div>
+          <button class="item-action" type="button" disabled>Galeria</button>
+        </article>
+        <article class="check-item" data-initial-item="8">
+          <div class="check-main"><button class="status-badge" type="button" disabled>9</button><div class="item-copy"><strong>Print Roteador PPPoE</strong><span>Selecionar print da galeria</span></div></div>
+          <button class="item-action" type="button" disabled>Galeria</button>
+        </article>
+        <article class="check-item" data-initial-item="9">
+          <div class="check-main"><button class="status-badge" type="button" disabled>10</button><div class="item-copy"><strong>Print Roteador Wi-Fi</strong><span>Selecionar print da galeria</span></div></div>
+          <button class="item-action" type="button" disabled>Galeria</button>
+        </article>
+        <article class="check-item" data-initial-item="10">
+          <div class="check-main"><button class="status-badge" type="button" disabled>11</button><div class="item-copy"><strong>Sinal PowerMeeter</strong><span>Ainda não fotografado</span></div></div>
+          <button class="item-action" type="button" disabled>Fotografar</button>
+        </article>
+        <article class="check-item" data-initial-item="11">
+          <div class="check-main"><button class="status-badge" type="button" disabled>12</button><div class="item-copy"><strong>Print Roteador 8.8.8.8</strong><span>Selecionar print da galeria</span></div></div>
+          <button class="item-action" type="button" disabled>Galeria</button>
+        </article>
+        <article class="check-item" data-initial-item="12">
+          <div class="check-main"><button class="status-badge" type="button" disabled>13</button><div class="item-copy"><strong>Print Velocidade</strong><span>Selecionar print da galeria</span></div></div>
+          <button class="item-action" type="button" disabled>Galeria</button>
+        </article>
+        <article class="check-item" data-initial-item="13">
+          <div class="check-main"><button class="status-badge" type="button" disabled>14</button><div class="item-copy"><strong>Equipamento + Etiqueta</strong><span>Ainda não fotografado</span></div></div>
+          <button class="item-action" type="button" disabled>Fotografar</button>
+        </article>
+        <article class="check-item" data-initial-item="14">
+          <div class="check-main"><button class="status-badge" type="button" disabled>15</button><div class="item-copy"><strong>Avaliação Frente</strong><span>Ainda não fotografado</span></div></div>
+          <button class="item-action" type="button" disabled>Fotografar</button>
+        </article>
+        <article class="check-item" data-initial-item="15">
+          <div class="check-main"><button class="status-badge" type="button" disabled>16</button><div class="item-copy"><strong>Avaliação Verso</strong><span>Ainda não fotografado</span></div></div>
+          <button class="item-action" type="button" disabled>Fotografar</button>
+        </article>
+        <article class="check-item" data-initial-item="16">
+          <div class="check-main"><button class="status-badge" type="button" disabled>17</button><div class="item-copy"><strong>Print Estoque batido</strong><span>Selecionar print da galeria</span></div></div>
+          <button class="item-action" type="button" disabled>Galeria</button>
+        </article>
+      </div>
+    </section>
+
+    <section class="message-section" aria-labelledby="messageSectionTitle">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">ORDEM DE SERVIÇO</p>
+          <h2 id="messageSectionTitle">Dados da mensagem</h2>
+        </div>
+      </div>
+      <div class="message-form">
+        <label class="message-field compact-field">
+          <span>Cód.</span>
+          <input id="serviceCode" type="text" inputmode="numeric" maxlength="5" value="59851" aria-label="Código da ordem de serviço" />
+        </label>
+
+        <div class="message-group">
+          <span class="message-group-title">Sinal</span>
+          <div class="message-inline-fields two-fields">
+            <label class="message-field tiny-field">
+              <span>CTO</span>
+              <input id="signalCto" type="text" inputmode="numeric" maxlength="2" value="18" aria-label="Sinal CTO" />
+            </label>
+            <label class="message-field tiny-field">
+              <span>ONU</span>
+              <input id="signalOnu" type="text" inputmode="numeric" maxlength="2" value="18" aria-label="Sinal ONU" />
+            </label>
+          </div>
+        </div>
+
+        <div class="message-group">
+          <span class="message-group-title">Velocidade</span>
+          <div class="message-inline-fields two-fields">
+            <label class="message-field tiny-field">
+              <span>Download</span>
+              <input id="speedDownload" type="text" inputmode="numeric" maxlength="3" value="495" aria-label="Velocidade de download" />
+            </label>
+            <label class="message-field tiny-field">
+              <span>Upload</span>
+              <input id="speedUpload" type="text" inputmode="numeric" maxlength="3" value="275" aria-label="Velocidade de upload" />
+            </label>
+          </div>
+        </div>
+
+        <label class="message-field wide-field">
+          <span>Equipamento instalado na</span>
+          <input id="equipmentLocation" type="text" maxlength="30" value="parede/mesa" aria-label="Local onde o equipamento foi instalado" />
+        </label>
+
+        <div class="message-group technician-group">
+          <span class="message-group-title">Técnico(s) <small>(1 obrigatório, 2º opcional)</small></span>
+          <div class="message-inline-fields technician-fields">
+            <label class="message-field">
+              <span>1º técnico</span>
+              <input id="technician1" type="text" maxlength="40" value="EVERTON" aria-label="Primeiro técnico" required />
+            </label>
+            <label class="message-field">
+              <span>2º técnico</span>
+              <input id="technician2" type="text" maxlength="40" value="LOURENÇO" aria-label="Segundo técnico opcional" />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <section class="message-preview" aria-label="Prévia da mensagem">
+        <div class="message-preview-heading">
+          <strong>Prévia da mensagem</strong>
+          <span>Atualizada automaticamente pelos campos acima</span>
+        </div>
+        <pre id="messagePreview" contenteditable="false" aria-readonly="true"></pre>
+        <button class="download-button copy-button" id="copyTextBtn" type="button">Copiar Texto</button>
+      </section>
+    </section>
+
+    <!--
+      Controlador independente da prévia.
+      Ele roda antes do app.js e não depende de câmera, GPS, checklist ou JSZip.
+      Assim, mesmo que outra parte do frontend falhe, a mensagem continua visível
+      e sincronizada com os inputs em tempo real.
+    -->
+    <script>
+      (() => {
+        const template = `ORDEM DE SERVIÇO REALIZADA!
+Cód.: [code]
+
+---
+
+SINAL:
+
+CTO:  [cto]
+
+ONU:  [onu]
+
+
+TESTE DE VELOCIDADE:
+
+Download: [download]
+
+Upload: [upload]
+
+---
+
+Contratos e avaliação assinados.
+
+Equipamento ficou instalado na [location]
+
+Roteador e ONU  atualizado e preset instalado.
+
+TESTE DE CONECTIVIDADE
+
+Ping para 8.8.8.8: estável, 28 ms.
+
+Ping para Gateway (192.168.1.1): estável, 26 ms.
+
+
+SEM NECESSIDADE DE AMPLIAÇÃO
+
+O roteador atual cobre toda a residência, sem degradação detectada.
+
+TRACEROUTE
+
+8.8.8.8: rota estável.
+
+
+Técnico(s)
+[tech1] / [tech2]`;
+
+        window.PHOTO_LIST_SERVICE_MESSAGE_TEMPLATE = template;
+
+        const inputIds = {
+          code: "serviceCode",
+          cto: "signalCto",
+          onu: "signalOnu",
+          download: "speedDownload",
+          upload: "speedUpload",
+          location: "equipmentLocation",
+          tech1: "technician1",
+          tech2: "technician2",
+        };
+
+        const preview = document.getElementById("messagePreview");
+
+        function getValue(id) {
+          const input = document.getElementById(id);
+          return input ? input.value.trim() : "";
+        }
+
+        function renderPreview() {
+          if (!preview) return "";
+
+          const fields = Object.fromEntries(
+            Object.entries(inputIds).map(([key, id]) => [key, getValue(id)])
+          );
+
+          let message = template.replace(/\[([^\]]+)\]/g, (match, key) =>
+            Object.prototype.hasOwnProperty.call(fields, key) ? fields[key] : ""
+          );
+
+          const technicianLine = fields.tech2
+            ? `${fields.tech1} / ${fields.tech2}`
+            : fields.tech1;
+
+          message = message
+            .replace(/Técnico\(s\)\n.*$/, `Técnico(s)\n${technicianLine}`)
+            .trim();
+
+          preview.textContent = message;
+          return message;
+        }
+
+        window.PHOTO_LIST_RENDER_SERVICE_PREVIEW = renderPreview;
+
+        Object.values(inputIds).forEach((id) => {
+          const input = document.getElementById(id);
+          input?.addEventListener("input", renderPreview);
+          input?.addEventListener("change", renderPreview);
+        });
+
+        renderPreview();
+      })();
+    </script>
+
+    <section class="download-section">
+      <button class="finalize-button" id="finalizeBtn" type="button" disabled>
+        Finalizar Instalação <span id="finalizeStatus">0/17</span>
+      </button>
+      <p>Gera o ZIP no navegador, envia as fotos ao grupo do Telegram com apenas o título da instalação e, após a confirmação, baixa uma cópia.</p>
+
+      <button class="download-button" id="downloadBtn" type="button" disabled>
+        Baixar todas as fotos <span id="downloadCount">0</span>
+      </button>
+      <p>Use este botão quando quiser apenas baixar o ZIP sem enviar ao Telegram.</p>
+    </section>
+  </main>
+
+  <dialog id="messageDialog">
+    <div class="dialog-body">
+      <strong id="dialogTitle">Aviso</strong>
+      <p id="dialogMessage"></p>
+      <pre id="dialogTrace" hidden></pre>
+      <div class="dialog-actions">
+        <button class="secondary-button" id="dialogCopyBtn" type="button" hidden>Copiar diagnóstico</button>
+        <button class="secondary-button" id="dialogCloseBtn" type="button">OK</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="db.js?v=20260824-persistence1"></script>
+  <script src="app.js?v=20260824-persistence1"></script>
+</body>
+</html>
