@@ -43,8 +43,10 @@ A captura agora passa por uma etapa de revisão no próprio WebView: o disparo c
 - O HTML inclui os 17 itens do checklist como conteúdo estático inicial; o `app.js` hidrata esse conteúdo em seguida, evitando que a lista dependa da conclusão do bootstrap assíncrono.
 - Um status 2xx cacheado hoje não faz nova requisição até a mudança da data local.
 - O site ainda possui dependências externas próprias (por exemplo Nominatim/Telegram e o JSZip via CDN no HTML fonte).
+- O botão `Copiar Texto` possui proteção de ação única por 5 segundos para evitar envios concorrentes por cliques repetidos.
 - O token do bot está embutido em `assets/site/app.js` e no `site-bundle.js`; ele não deve ser tratado como segredo protegido.
 - O bundle local precisa ser regenerado sempre que `assets/site/` mudar.
+- A localização é atualizada nas ações explícitas de limpar tudo, marcar item manualmente, capturar foto e selecionar imagem da galeria. A atualização é transacional: se a tentativa falhar, a localização anterior (inclusive latitude/longitude) permanece; se não houver localização anterior, a ação prossegue sem confirmação e pode ficar sem localização.
 - Alterações na identidade do dispositivo devem manter o prefixo `Dispositivo:` em todos os envios ao Telegram e o sufixo curto do ID.
 - A regra de localização não usa mais timer persistente nem depende de `localStorage` para decidir envios.
 - A identidade do dispositivo e o prefixo `Dispositivo:` continuam sendo aplicados aos textos enviados ao Telegram.
@@ -61,7 +63,7 @@ Gerar e instalar um APK novo e testar:
 - print da galeria salvo enviando uma única mensagem contextual com localização;
 - checkbox manual marcado sem foto enviando uma única confirmação com localização;
 - múltiplos re-renders sem qualquer envio adicional de localização;
-- botão `Copiar Texto` mantendo seu fluxo atual de cópia e envio.
+- botão `Copiar Texto`: o primeiro clique trava imediatamente o botão, mantém `Copiado!` em verde por 5 segundos e impede novas execuções durante esse intervalo; depois volta a `Copiar Texto`.
 
 ## Entrada direta do Telegram
 O site estático embutido no APK inicia diretamente com o token fixo do bot definido no código. O antigo fallback para WhatsApp e o bootstrap por query string/localStorage foram removidos.

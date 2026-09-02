@@ -27,8 +27,13 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.READ_MEDIA_IMAGES"
-      ]
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ],
+      "package": "com.everton_lourens.PhotoList"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -54,6 +59,11 @@
           "isAccessMediaLocationEnabled": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d05232a7-df6e-4b4d-b621-af34211111c2"
+      }
+    }
   }
 }

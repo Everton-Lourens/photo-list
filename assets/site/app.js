@@ -286,14 +286,20 @@ function wireMessagePersistence() {
   });
 }
 
-function markCopyTextButtonCopied() {
+let copyTextLocked = false;
+
+function lockCopyTextButton() {
+  copyTextLocked = true;
+  copyTextBtn.disabled = true;
   copyTextBtn.classList.add("copied");
   copyTextBtn.textContent = "Copiado!";
-  window.clearTimeout(markCopyTextButtonCopied.timer);
-  markCopyTextButtonCopied.timer = window.setTimeout(() => {
+  window.clearTimeout(lockCopyTextButton.timer);
+  lockCopyTextButton.timer = window.setTimeout(() => {
+    copyTextLocked = false;
+    copyTextBtn.disabled = false;
     copyTextBtn.classList.remove("copied");
     copyTextBtn.textContent = "Copiar Texto";
-  }, 2000);
+  }, 5000);
 }
 
 function getGoogleMapsLocationUrl(location = state.location) {
@@ -341,35 +347,76 @@ async function sendTelegramText(text, context = "telegram-text") {
   return result;
 }
 
-async function ensureLocationSnapshot() {
-  if (state.location) return state.location;
-  if (!navigator.geolocation) throw new Error("Localização indisponível no dispositivo.");
-
-  const position = await new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 15000,
-    });
-  });
-
-  const { latitude, longitude, accuracy } = position.coords;
-  state.location = { latitude, longitude, accuracy, address: "" };
-  state.lastLocationAt = Date.now();
+async function refreshLocationSnapshot() {
+  const previousLocation = state.location ? { ...state.location } : null;
+  setLocationStatus("", "Localização: atualizando…", "Tentando obter a posição atual do dispositivo.");
 
   try {
+    if (!navigator.geolocation) {
+      throw new Error("Localização indisponível no dispositivo.");
+    }
+
+    const position = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 15000,
+      });
+    });
+
+    const { latitude, longitude, accuracy } = position.coords;
+    const nextLocation = { latitude, longitude, accuracy, address: "" };
+
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}&zoom=18&addressdetails=1&accept-language=pt-BR`;
     const response = await fetch(url, { headers: { Accept: "application/json" } });
-    if (response.ok) {
-      const data = await response.json();
-      state.location.address = data.display_name || "";
-    updateCameraLiveLocation();
+    if (!response.ok) {
+      throw new Error(`Falha ao atualizar o endereço (HTTP ${response.status}).`);
     }
-  } catch (_) {
-    // Coordenadas continuam sendo uma localização válida.
-  }
+    const data = await response.json();
+    nextLocation.address = data.display_name || "";
 
-  return state.location;
+    state.location = nextLocation;
+    state.lastLocationAt = Date.now();
+    updateCameraLiveLocation();
+
+    const coordText = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+    setLocationStatus(
+      "ready",
+      "Localização pronta",
+      nextLocation.address
+        ? `${nextLocation.address} · GPS ${coordText}`
+        : `GPS ${coordText} · precisão ±${Math.round(accuracy)} m`
+    );
+
+    return state.location;
+  } catch (error) {
+    state.location = previousLocation;
+    updateCameraLiveLocation();
+
+    if (previousLocation) {
+      const coords = `${previousLocation.latitude.toFixed(6)}, ${previousLocation.longitude.toFixed(6)}`;
+      setLocationStatus(
+        "ready",
+        "Localização anterior mantida",
+        previousLocation.address
+          ? `${previousLocation.address} · GPS ${coords}`
+          : `GPS ${coords} · precisão ±${Math.round(previousLocation.accuracy || 0)} m`
+      );
+      return previousLocation;
+    }
+
+    setLocationStatus(
+      "error",
+      "Localização não disponível",
+      error?.message || "Não foi possível obter a posição atual."
+    );
+    return null;
+  }
+}
+
+async function ensureLocationSnapshot() {
+  if (state.location) return state.location;
+  return refreshLocationSnapshot();
 }
 
 function getLocationNotificationText(actionText, location) {
@@ -390,22 +437,26 @@ function getLocationNotificationText(actionText, location) {
   ].filter(Boolean).join("\n");
 }
 
-async function sendLocationNotification(actionText, context = "location-action") {
-  const location = await ensureLocationSnapshot();
+async function sendLocationNotification(actionText, context = "location-action", locationOverride = undefined) {
+  const location = locationOverride === undefined
+    ? await refreshLocationSnapshot()
+    : locationOverride;
+  if (!location) throw new Error("Localização não disponível no dispositivo.");
   const text = getLocationNotificationText(actionText, location);
   await sendTelegramText(text, context);
   return location;
 }
 
+
 function getPhotoNotificationText(label) {
   const normalized = String(label || "").trim();
   const photoMessages = {
-    "Roteador Frente": "Foto frente do roteador tirada",
-    "Roteador Verso": "Foto verso do roteador tirada",
-    "ONU Frente": "Foto frente da ONU tirada",
-    "ONU Verso": "Foto verso da ONU tirada",
-    "Print comodato": "Print do comodato tirado",
-  };
+    "Roteador Frente": "\nFOTO FRENTE DO ROTEADOR TIRADA\n",
+    "Roteador Verso": "\nFOTO VERSO DO ROTEADOR TIRADA\n",
+    "ONU Frente": "\nFOTO FRENTE DA ONU TIRADA\n",
+    "ONU Verso": "\nFOTO VERSO DA ONU TIRADA\n",
+    "Print comodato": "\nPRINT DO COMODATO TIRADO\n",
+};
   if (photoMessages[normalized]) return photoMessages[normalized];
   if (normalized.startsWith(PRINT_PREFIX)) return `${normalized} tirado`;
   return `Foto ${normalized.toLowerCase()} tirada`;
@@ -428,16 +479,17 @@ function getManualCheckNotificationText(label) {
 async function notifyLocationAction(actionText, context) {
   try {
     await sendLocationNotification(actionText, context);
-    showToast("Localização enviada ao Tel..", "success");
   } catch (error) {
-    console.warn("Falha ao enviar localização ao Tel..", error);
-    showToast(`A ação foi registrada, mas a localização não foi enviada: ${error.message || "erro de envio"}`, "error");
+    console.warn("Falha en loc Tel..", error);
+    //(`A ação foi registrada, mas a localização não foi enviada: ${error.message || "erro de envio"}`, "error");
   }
 }
 
 async function copyServiceMessage() {
+  if (copyTextLocked || copyTextBtn.disabled) return;
   const message = getCurrentServiceMessage();
   if (!message) return;
+  lockCopyTextButton();
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(message);
@@ -454,15 +506,13 @@ async function copyServiceMessage() {
 
     const location = await ensureLocationSnapshot();
     const url = getGoogleMapsLocationUrl(location);
-    if (!url) throw new Error("Texto copiado, mas não foi possível gerar a URL da localização.");
+    if (!url) console.warn("Texto copiado, porém url não foi gerada");
 
     await sendTelegramText(`Os Finalizada!\n${url}`, "copy-finalized");
-    markCopyTextButtonCopied();
     showToast("Texto copiado.", "success");
   } catch (error) {
     console.warn("Falha ao copiar/enviar a prévia da mensagem.", error);
-    markCopyTextButtonCopied();
-    showToast(error.message || "Não foi possível enviar a finalização.", "error");
+    //showToast(error.message || "Não foi possível enviar a finalização.", "error");
   }
 }
 
@@ -557,44 +607,7 @@ function setLocationStatus(kind, title, details) {
 }
 
 async function requestLocation() {
-  if (!navigator.geolocation) {
-    setLocationStatus("error", "Localização indisponível", "Este navegador não oferece GPS/geolocalização.");
-    return;
-  }
-
-  setLocationStatus("", "Localização: buscando…", "Aguardando a posição atual do dispositivo.");
-
-  navigator.geolocation.getCurrentPosition(async (position) => {
-    const { latitude, longitude, accuracy } = position.coords;
-    state.location = { latitude, longitude, accuracy, address: "" };
-    state.lastLocationAt = Date.now();
-
-    let address = "";
-    try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}&zoom=18&addressdetails=1&accept-language=pt-BR`;
-      const response = await fetch(url, { headers: { "Accept": "application/json" } });
-      if (response.ok) {
-        const data = await response.json();
-        address = data.display_name || "";
-      }
-    } catch (_) {
-      // GPS continua válido mesmo quando o endereço não puder ser resolvido.
-    }
-
-    state.location.address = address;
-    updateCameraLiveLocation();
-    const coordText = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-    setLocationStatus("ready", "Localização pronta", address ? `${address} · GPS ${coordText}` : `GPS ${coordText} · precisão ±${Math.round(accuracy)} m`);
-  }, (error) => {
-    const message = error.code === 1
-      ? "Permissão negada. Ative a localização para registrar GPS/endereço nas fotos."
-      : "Não foi possível obter a posição atual. Tente novamente.";
-    setLocationStatus("error", "Localização não disponível", message);
-  }, {
-    enableHighAccuracy: true,
-    maximumAge: 0,
-    timeout: 15000,
-  });
+  await refreshLocationSnapshot();
 }
 
 function scrollToCamera({ behavior = "smooth" } = {}) {
@@ -808,21 +821,18 @@ async function capturePhoto() {
     showDialog("Câmera inativa", "Inicie a câmera antes de tirar uma foto.");
     return;
   }
-  if (!state.location) {
-    const confirmed = window.confirm("A localização ainda não foi obtida. Tirar a foto mesmo assim?");
-    if (!confirmed) return;
-  }
+  const actionLocation = await refreshLocationSnapshot();
 
   const index = state.selectedIndex;
   const date = new Date();
   await waitForVideoFrame();
-  const dataUrl = drawCameraPhoto(itemLabel, date, state.location);
+  const dataUrl = drawCameraPhoto(itemLabel, date, actionLocation);
   showPendingCapture({
     index,
     label: itemLabel,
     date,
     dataUrl,
-    location: state.location ? { ...state.location } : null,
+    location: actionLocation ? { ...actionLocation } : null,
     source: "camera",
   });
 }
@@ -870,20 +880,17 @@ async function handleGallerySelection(event) {
     showDialog("Arquivo inválido", "Selecione uma imagem da galeria para este item.");
     return;
   }
-  if (!state.location) {
-    const confirmed = window.confirm("A localização ainda não foi obtida. Selecionar o print mesmo assim?");
-    if (!confirmed) return;
-  }
+  const actionLocation = await refreshLocationSnapshot();
 
   try {
     const date = new Date();
     cameraHint.textContent = "Processando o print selecionado…";
-    const dataUrl = await drawGalleryPhoto(file, itemLabel, date, state.location);
+    const dataUrl = await drawGalleryPhoto(file, itemLabel, date, actionLocation);
     const photo = {
       label: itemLabel,
       date,
       dataUrl,
-      location: state.location ? { ...state.location } : null,
+      location: actionLocation ? { ...actionLocation } : null,
       source: "gallery",
       originalName: file.name,
     };
@@ -1239,6 +1246,7 @@ async function resetAll() {
   state.selectedIndex = 0;
   galleryInput.value = "";
   await clearPhotoCache();
+  await refreshLocationSnapshot();
   renderChecklist();
   cameraHint.textContent = "Checklist limpo. As fotos do cache foram removidas. A prévia da mensagem continua salva.";
 }

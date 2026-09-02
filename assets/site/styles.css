@@ -277,4 +277,8 @@ dialog::backdrop { background: rgba(0,0,0,.6); }
 .save-toast.error { border-color: #ef4444; }
 
 .copy-button { margin-top: 10px; }
-.copy-button.copied { background: #16a34a; color: #fff; }
+.copy-button.copied, .copy-button.copied:disabled {
+  background: #16a34a;
+  color: #fff;
+}
+.copy-button.copied:disabled { opacity: 1; cursor: not-allowed; }
